@@ -11,15 +11,12 @@
 
 'use strict';
 
-var EventConstants = require('EventConstants');
 var EventPluginUtils = require('EventPluginUtils');
 var EventPropagators = require('EventPropagators');
 var ResponderSyntheticEvent = require('ResponderSyntheticEvent');
 var ResponderTouchHistoryStore = require('ResponderTouchHistoryStore');
 
 var accumulate = require('accumulate');
-var invariant = require('invariant');
-var keyOf = require('keyOf');
 
 var isStartish = EventPluginUtils.isStartish;
 var isMoveish = EventPluginUtils.isMoveish;
@@ -65,8 +62,8 @@ var eventTypes = {
    */
   startShouldSetResponder: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onStartShouldSetResponder: null}),
-      captured: keyOf({onStartShouldSetResponderCapture: null}),
+      bubbled: 'onStartShouldSetResponder',
+      captured: 'onStartShouldSetResponderCapture',
     },
   },
 
@@ -81,8 +78,8 @@ var eventTypes = {
    */
   scrollShouldSetResponder: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onScrollShouldSetResponder: null}),
-      captured: keyOf({onScrollShouldSetResponderCapture: null}),
+      bubbled: 'onScrollShouldSetResponder',
+      captured: 'onScrollShouldSetResponderCapture',
     },
   },
 
@@ -95,8 +92,8 @@ var eventTypes = {
    */
   selectionChangeShouldSetResponder: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onSelectionChangeShouldSetResponder: null}),
-      captured: keyOf({onSelectionChangeShouldSetResponderCapture: null}),
+      bubbled: 'onSelectionChangeShouldSetResponder',
+      captured: 'onSelectionChangeShouldSetResponderCapture',
     },
   },
 
@@ -106,24 +103,24 @@ var eventTypes = {
    */
   moveShouldSetResponder: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onMoveShouldSetResponder: null}),
-      captured: keyOf({onMoveShouldSetResponderCapture: null}),
+      bubbled: 'onMoveShouldSetResponder',
+      captured: 'onMoveShouldSetResponderCapture',
     },
   },
 
   /**
    * Direct responder events dispatched directly to responder. Do not bubble.
    */
-  responderStart: {registrationName: keyOf({onResponderStart: null})},
-  responderMove: {registrationName: keyOf({onResponderMove: null})},
-  responderEnd: {registrationName: keyOf({onResponderEnd: null})},
-  responderRelease: {registrationName: keyOf({onResponderRelease: null})},
+  responderStart: {registrationName: 'onResponderStart'},
+  responderMove: {registrationName: 'onResponderMove'},
+  responderEnd: {registrationName: 'onResponderEnd'},
+  responderRelease: {registrationName: 'onResponderRelease'},
   responderTerminationRequest: {
-    registrationName: keyOf({onResponderTerminationRequest: null}),
+    registrationName: 'onResponderTerminationRequest',
   },
-  responderGrant: {registrationName: keyOf({onResponderGrant: null})},
-  responderReject: {registrationName: keyOf({onResponderReject: null})},
-  responderTerminate: {registrationName: keyOf({onResponderTerminate: null})},
+  responderGrant: {registrationName: 'onResponderGrant'},
+  responderReject: {registrationName: 'onResponderReject'},
+  responderTerminate: {registrationName: 'onResponderTerminate'},
 };
 
 /**
@@ -327,7 +324,7 @@ function setResponderAndExtractTransfer(
   var shouldSetEventType =
     isStartish(topLevelType) ? eventTypes.startShouldSetResponder :
     isMoveish(topLevelType) ? eventTypes.moveShouldSetResponder :
-    topLevelType === EventConstants.topLevelTypes.topSelectionChange ?
+    topLevelType === 'topSelectionChange' ?
       eventTypes.selectionChangeShouldSetResponder :
     eventTypes.scrollShouldSetResponder;
 
@@ -430,10 +427,10 @@ function canTriggerTransfer(topLevelType, topLevelInst, nativeEvent) {
     // responderIgnoreScroll: We are trying to migrate away from specifically
     // tracking native scroll events here and responderIgnoreScroll indicates we
     // will send topTouchCancel to handle canceling touch events instead
-    (topLevelType === EventConstants.topLevelTypes.topScroll &&
+    (topLevelType === 'topScroll' &&
       !nativeEvent.responderIgnoreScroll) ||
     (trackedTouchCount > 0 &&
-      topLevelType === EventConstants.topLevelTypes.topSelectionChange) ||
+      topLevelType === 'topSelectionChange') ||
     isStartish(topLevelType) ||
     isMoveish(topLevelType)
   );
@@ -489,14 +486,17 @@ var ResponderEventPlugin = {
     if (isStartish(topLevelType)) {
       trackedTouchCount += 1;
     } else if (isEndish(topLevelType)) {
-      trackedTouchCount -= 1;
-      invariant(
-        trackedTouchCount >= 0,
-        'Ended a touch event which was not counted in trackedTouchCount.'
-      );
+      if (trackedTouchCount >= 0) {
+        trackedTouchCount -= 1;
+      } else {
+        console.error(
+          'Ended a touch event which was not counted in `trackedTouchCount`.'
+        );
+        return null;
+      }
     }
 
-    ResponderTouchHistoryStore.recordTouchTrack(topLevelType, nativeEvent, nativeEventTarget);
+    ResponderTouchHistoryStore.recordTouchTrack(topLevelType, nativeEvent);
 
     var extracted = canTriggerTransfer(topLevelType, targetInst, nativeEvent) ?
       setResponderAndExtractTransfer(
@@ -539,7 +539,7 @@ var ResponderEventPlugin = {
 
     var isResponderTerminate =
       responderInst &&
-      topLevelType === EventConstants.topLevelTypes.topTouchCancel;
+      topLevelType === 'topTouchCancel';
     var isResponderRelease =
       responderInst &&
       !isResponderTerminate &&

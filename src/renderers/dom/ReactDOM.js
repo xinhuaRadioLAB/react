@@ -27,7 +27,7 @@ var warning = require('warning');
 
 ReactDefaultInjection.inject();
 
-var React = {
+var ReactDOM = {
   findDOMNode: findDOMNode,
   render: ReactMount.render,
   unmountComponentAtNode: ReactMount.unmountComponentAtNode,
@@ -135,4 +135,13 @@ if (__DEV__) {
   }
 }
 
-module.exports = React;
+if (__DEV__) {
+  var ReactInstrumentation = require('ReactInstrumentation');
+  var ReactDOMUnknownPropertyHook = require('ReactDOMUnknownPropertyHook');
+  var ReactDOMNullInputValuePropHook = require('ReactDOMNullInputValuePropHook');
+
+  ReactInstrumentation.debugTool.addHook(ReactDOMUnknownPropertyHook);
+  ReactInstrumentation.debugTool.addHook(ReactDOMNullInputValuePropHook);
+}
+
+module.exports = ReactDOM;

@@ -7,10 +7,17 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *
  * @providesModule ReactInstrumentation
+ * @flow
  */
 
 'use strict';
 
-var ReactDebugTool = require('ReactDebugTool');
+// Trust the developer to only use ReactInstrumentation with a __DEV__ check
+var debugTool = ((null: any): typeof ReactDebugTool);
 
-module.exports = {debugTool: ReactDebugTool};
+if (__DEV__) {
+  var ReactDebugTool = require('ReactDebugTool');
+  debugTool = ReactDebugTool;
+}
+
+module.exports = {debugTool};

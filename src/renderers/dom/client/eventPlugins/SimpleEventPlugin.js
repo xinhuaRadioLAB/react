@@ -11,7 +11,6 @@
 
 'use strict';
 
-var EventConstants = require('EventConstants');
 var EventListener = require('EventListener');
 var EventPropagators = require('EventPropagators');
 var ReactDOMComponentTree = require('ReactDOMComponentTree');
@@ -30,383 +29,380 @@ var SyntheticWheelEvent = require('SyntheticWheelEvent');
 var emptyFunction = require('emptyFunction');
 var getEventCharCode = require('getEventCharCode');
 var invariant = require('invariant');
-var keyOf = require('keyOf');
-
-var topLevelTypes = EventConstants.topLevelTypes;
 
 var eventTypes = {
   abort: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onAbort: true}),
-      captured: keyOf({onAbortCapture: true}),
+      bubbled: 'onAbort',
+      captured: 'onAbortCapture',
     },
   },
   animationEnd: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onAnimationEnd: true}),
-      captured: keyOf({onAnimationEndCapture: true}),
+      bubbled: 'onAnimationEnd',
+      captured: 'onAnimationEndCapture',
     },
   },
   animationIteration: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onAnimationIteration: true}),
-      captured: keyOf({onAnimationIterationCapture: true}),
+      bubbled: 'onAnimationIteration',
+      captured: 'onAnimationIterationCapture',
     },
   },
   animationStart: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onAnimationStart: true}),
-      captured: keyOf({onAnimationStartCapture: true}),
+      bubbled: 'onAnimationStart',
+      captured: 'onAnimationStartCapture',
     },
   },
   blur: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onBlur: true}),
-      captured: keyOf({onBlurCapture: true}),
+      bubbled: 'onBlur',
+      captured: 'onBlurCapture',
     },
   },
   canPlay: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onCanPlay: true}),
-      captured: keyOf({onCanPlayCapture: true}),
+      bubbled: 'onCanPlay',
+      captured: 'onCanPlayCapture',
     },
   },
   canPlayThrough: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onCanPlayThrough: true}),
-      captured: keyOf({onCanPlayThroughCapture: true}),
+      bubbled: 'onCanPlayThrough',
+      captured: 'onCanPlayThroughCapture',
     },
   },
   click: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onClick: true}),
-      captured: keyOf({onClickCapture: true}),
+      bubbled: 'onClick',
+      captured: 'onClickCapture',
     },
   },
   contextMenu: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onContextMenu: true}),
-      captured: keyOf({onContextMenuCapture: true}),
+      bubbled: 'onContextMenu',
+      captured: 'onContextMenuCapture',
     },
   },
   copy: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onCopy: true}),
-      captured: keyOf({onCopyCapture: true}),
+      bubbled: 'onCopy',
+      captured: 'onCopyCapture',
     },
   },
   cut: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onCut: true}),
-      captured: keyOf({onCutCapture: true}),
+      bubbled: 'onCut',
+      captured: 'onCutCapture',
     },
   },
   doubleClick: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onDoubleClick: true}),
-      captured: keyOf({onDoubleClickCapture: true}),
+      bubbled: 'onDoubleClick',
+      captured: 'onDoubleClickCapture',
     },
   },
   drag: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onDrag: true}),
-      captured: keyOf({onDragCapture: true}),
+      bubbled: 'onDrag',
+      captured: 'onDragCapture',
     },
   },
   dragEnd: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onDragEnd: true}),
-      captured: keyOf({onDragEndCapture: true}),
+      bubbled: 'onDragEnd',
+      captured: 'onDragEndCapture',
     },
   },
   dragEnter: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onDragEnter: true}),
-      captured: keyOf({onDragEnterCapture: true}),
+      bubbled: 'onDragEnter',
+      captured: 'onDragEnterCapture',
     },
   },
   dragExit: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onDragExit: true}),
-      captured: keyOf({onDragExitCapture: true}),
+      bubbled: 'onDragExit',
+      captured: 'onDragExitCapture',
     },
   },
   dragLeave: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onDragLeave: true}),
-      captured: keyOf({onDragLeaveCapture: true}),
+      bubbled: 'onDragLeave',
+      captured: 'onDragLeaveCapture',
     },
   },
   dragOver: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onDragOver: true}),
-      captured: keyOf({onDragOverCapture: true}),
+      bubbled: 'onDragOver',
+      captured: 'onDragOverCapture',
     },
   },
   dragStart: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onDragStart: true}),
-      captured: keyOf({onDragStartCapture: true}),
+      bubbled: 'onDragStart',
+      captured: 'onDragStartCapture',
     },
   },
   drop: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onDrop: true}),
-      captured: keyOf({onDropCapture: true}),
+      bubbled: 'onDrop',
+      captured: 'onDropCapture',
     },
   },
   durationChange: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onDurationChange: true}),
-      captured: keyOf({onDurationChangeCapture: true}),
+      bubbled: 'onDurationChange',
+      captured: 'onDurationChangeCapture',
     },
   },
   emptied: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onEmptied: true}),
-      captured: keyOf({onEmptiedCapture: true}),
+      bubbled: 'onEmptied',
+      captured: 'onEmptiedCapture',
     },
   },
   encrypted: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onEncrypted: true}),
-      captured: keyOf({onEncryptedCapture: true}),
+      bubbled: 'onEncrypted',
+      captured: 'onEncryptedCapture',
     },
   },
   ended: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onEnded: true}),
-      captured: keyOf({onEndedCapture: true}),
+      bubbled: 'onEnded',
+      captured: 'onEndedCapture',
     },
   },
   error: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onError: true}),
-      captured: keyOf({onErrorCapture: true}),
+      bubbled: 'onError',
+      captured: 'onErrorCapture',
     },
   },
   focus: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onFocus: true}),
-      captured: keyOf({onFocusCapture: true}),
+      bubbled: 'onFocus',
+      captured: 'onFocusCapture',
     },
   },
   input: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onInput: true}),
-      captured: keyOf({onInputCapture: true}),
+      bubbled: 'onInput',
+      captured: 'onInputCapture',
     },
   },
   invalid: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onInvalid: true}),
-      captured: keyOf({onInvalidCapture: true}),
+      bubbled: 'onInvalid',
+      captured: 'onInvalidCapture',
     },
   },
   keyDown: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onKeyDown: true}),
-      captured: keyOf({onKeyDownCapture: true}),
+      bubbled: 'onKeyDown',
+      captured: 'onKeyDownCapture',
     },
   },
   keyPress: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onKeyPress: true}),
-      captured: keyOf({onKeyPressCapture: true}),
+      bubbled: 'onKeyPress',
+      captured: 'onKeyPressCapture',
     },
   },
   keyUp: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onKeyUp: true}),
-      captured: keyOf({onKeyUpCapture: true}),
+      bubbled: 'onKeyUp',
+      captured: 'onKeyUpCapture',
     },
   },
   load: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onLoad: true}),
-      captured: keyOf({onLoadCapture: true}),
+      bubbled: 'onLoad',
+      captured: 'onLoadCapture',
     },
   },
   loadedData: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onLoadedData: true}),
-      captured: keyOf({onLoadedDataCapture: true}),
+      bubbled: 'onLoadedData',
+      captured: 'onLoadedDataCapture',
     },
   },
   loadedMetadata: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onLoadedMetadata: true}),
-      captured: keyOf({onLoadedMetadataCapture: true}),
+      bubbled: 'onLoadedMetadata',
+      captured: 'onLoadedMetadataCapture',
     },
   },
   loadStart: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onLoadStart: true}),
-      captured: keyOf({onLoadStartCapture: true}),
+      bubbled: 'onLoadStart',
+      captured: 'onLoadStartCapture',
     },
   },
   // Note: We do not allow listening to mouseOver events. Instead, use the
   // onMouseEnter/onMouseLeave created by `EnterLeaveEventPlugin`.
   mouseDown: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onMouseDown: true}),
-      captured: keyOf({onMouseDownCapture: true}),
+      bubbled: 'onMouseDown',
+      captured: 'onMouseDownCapture',
     },
   },
   mouseMove: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onMouseMove: true}),
-      captured: keyOf({onMouseMoveCapture: true}),
+      bubbled: 'onMouseMove',
+      captured: 'onMouseMoveCapture',
     },
   },
   mouseOut: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onMouseOut: true}),
-      captured: keyOf({onMouseOutCapture: true}),
+      bubbled: 'onMouseOut',
+      captured: 'onMouseOutCapture',
     },
   },
   mouseOver: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onMouseOver: true}),
-      captured: keyOf({onMouseOverCapture: true}),
+      bubbled: 'onMouseOver',
+      captured: 'onMouseOverCapture',
     },
   },
   mouseUp: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onMouseUp: true}),
-      captured: keyOf({onMouseUpCapture: true}),
+      bubbled: 'onMouseUp',
+      captured: 'onMouseUpCapture',
     },
   },
   paste: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onPaste: true}),
-      captured: keyOf({onPasteCapture: true}),
+      bubbled: 'onPaste',
+      captured: 'onPasteCapture',
     },
   },
   pause: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onPause: true}),
-      captured: keyOf({onPauseCapture: true}),
+      bubbled: 'onPause',
+      captured: 'onPauseCapture',
     },
   },
   play: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onPlay: true}),
-      captured: keyOf({onPlayCapture: true}),
+      bubbled: 'onPlay',
+      captured: 'onPlayCapture',
     },
   },
   playing: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onPlaying: true}),
-      captured: keyOf({onPlayingCapture: true}),
+      bubbled: 'onPlaying',
+      captured: 'onPlayingCapture',
     },
   },
   progress: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onProgress: true}),
-      captured: keyOf({onProgressCapture: true}),
+      bubbled: 'onProgress',
+      captured: 'onProgressCapture',
     },
   },
   rateChange: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onRateChange: true}),
-      captured: keyOf({onRateChangeCapture: true}),
+      bubbled: 'onRateChange',
+      captured: 'onRateChangeCapture',
     },
   },
   reset: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onReset: true}),
-      captured: keyOf({onResetCapture: true}),
+      bubbled: 'onReset',
+      captured: 'onResetCapture',
     },
   },
   scroll: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onScroll: true}),
-      captured: keyOf({onScrollCapture: true}),
+      bubbled: 'onScroll',
+      captured: 'onScrollCapture',
     },
   },
   seeked: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onSeeked: true}),
-      captured: keyOf({onSeekedCapture: true}),
+      bubbled: 'onSeeked',
+      captured: 'onSeekedCapture',
     },
   },
   seeking: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onSeeking: true}),
-      captured: keyOf({onSeekingCapture: true}),
+      bubbled: 'onSeeking',
+      captured: 'onSeekingCapture',
     },
   },
   stalled: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onStalled: true}),
-      captured: keyOf({onStalledCapture: true}),
+      bubbled: 'onStalled',
+      captured: 'onStalledCapture',
     },
   },
   submit: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onSubmit: true}),
-      captured: keyOf({onSubmitCapture: true}),
+      bubbled: 'onSubmit',
+      captured: 'onSubmitCapture',
     },
   },
   suspend: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onSuspend: true}),
-      captured: keyOf({onSuspendCapture: true}),
+      bubbled: 'onSuspend',
+      captured: 'onSuspendCapture',
     },
   },
   timeUpdate: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onTimeUpdate: true}),
-      captured: keyOf({onTimeUpdateCapture: true}),
+      bubbled: 'onTimeUpdate',
+      captured: 'onTimeUpdateCapture',
     },
   },
   touchCancel: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onTouchCancel: true}),
-      captured: keyOf({onTouchCancelCapture: true}),
+      bubbled: 'onTouchCancel',
+      captured: 'onTouchCancelCapture',
     },
   },
   touchEnd: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onTouchEnd: true}),
-      captured: keyOf({onTouchEndCapture: true}),
+      bubbled: 'onTouchEnd',
+      captured: 'onTouchEndCapture',
     },
   },
   touchMove: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onTouchMove: true}),
-      captured: keyOf({onTouchMoveCapture: true}),
+      bubbled: 'onTouchMove',
+      captured: 'onTouchMoveCapture',
     },
   },
   touchStart: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onTouchStart: true}),
-      captured: keyOf({onTouchStartCapture: true}),
+      bubbled: 'onTouchStart',
+      captured: 'onTouchStartCapture',
     },
   },
   transitionEnd: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onTransitionEnd: true}),
-      captured: keyOf({onTransitionEndCapture: true}),
+      bubbled: 'onTransitionEnd',
+      captured: 'onTransitionEndCapture',
     },
   },
   volumeChange: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onVolumeChange: true}),
-      captured: keyOf({onVolumeChangeCapture: true}),
+      bubbled: 'onVolumeChange',
+      captured: 'onVolumeChangeCapture',
     },
   },
   waiting: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onWaiting: true}),
-      captured: keyOf({onWaitingCapture: true}),
+      bubbled: 'onWaiting',
+      captured: 'onWaitingCapture',
     },
   },
   wheel: {
     phasedRegistrationNames: {
-      bubbled: keyOf({onWheel: true}),
-      captured: keyOf({onWheelCapture: true}),
+      bubbled: 'onWheel',
+      captured: 'onWheelCapture',
     },
   },
 };
@@ -480,8 +476,13 @@ for (var type in topLevelEventsToDispatchConfig) {
   topLevelEventsToDispatchConfig[type].dependencies = [type];
 }
 
-var ON_CLICK_KEY = keyOf({onClick: null});
 var onClickListeners = {};
+
+function getDictionaryKey(inst) {
+  // Prevents V8 performance issue:
+  // https://github.com/facebook/react/pull/7232
+  return '.' + inst._rootNodeID;
+}
 
 var SimpleEventPlugin = {
 
@@ -499,39 +500,39 @@ var SimpleEventPlugin = {
     }
     var EventConstructor;
     switch (topLevelType) {
-      case topLevelTypes.topAbort:
-      case topLevelTypes.topCanPlay:
-      case topLevelTypes.topCanPlayThrough:
-      case topLevelTypes.topDurationChange:
-      case topLevelTypes.topEmptied:
-      case topLevelTypes.topEncrypted:
-      case topLevelTypes.topEnded:
-      case topLevelTypes.topError:
-      case topLevelTypes.topInput:
-      case topLevelTypes.topInvalid:
-      case topLevelTypes.topLoad:
-      case topLevelTypes.topLoadedData:
-      case topLevelTypes.topLoadedMetadata:
-      case topLevelTypes.topLoadStart:
-      case topLevelTypes.topPause:
-      case topLevelTypes.topPlay:
-      case topLevelTypes.topPlaying:
-      case topLevelTypes.topProgress:
-      case topLevelTypes.topRateChange:
-      case topLevelTypes.topReset:
-      case topLevelTypes.topSeeked:
-      case topLevelTypes.topSeeking:
-      case topLevelTypes.topStalled:
-      case topLevelTypes.topSubmit:
-      case topLevelTypes.topSuspend:
-      case topLevelTypes.topTimeUpdate:
-      case topLevelTypes.topVolumeChange:
-      case topLevelTypes.topWaiting:
+      case 'topAbort':
+      case 'topCanPlay':
+      case 'topCanPlayThrough':
+      case 'topDurationChange':
+      case 'topEmptied':
+      case 'topEncrypted':
+      case 'topEnded':
+      case 'topError':
+      case 'topInput':
+      case 'topInvalid':
+      case 'topLoad':
+      case 'topLoadedData':
+      case 'topLoadedMetadata':
+      case 'topLoadStart':
+      case 'topPause':
+      case 'topPlay':
+      case 'topPlaying':
+      case 'topProgress':
+      case 'topRateChange':
+      case 'topReset':
+      case 'topSeeked':
+      case 'topSeeking':
+      case 'topStalled':
+      case 'topSubmit':
+      case 'topSuspend':
+      case 'topTimeUpdate':
+      case 'topVolumeChange':
+      case 'topWaiting':
         // HTML Events
         // @see http://www.w3.org/TR/html5/index.html#events-0
         EventConstructor = SyntheticEvent;
         break;
-      case topLevelTypes.topKeyPress:
+      case 'topKeyPress':
         // Firefox creates a keypress event for function keys too. This removes
         // the unwanted keypress events. Enter is however both printable and
         // non-printable. One would expect Tab to be as well (but it isn't).
@@ -539,63 +540,63 @@ var SimpleEventPlugin = {
           return null;
         }
         /* falls through */
-      case topLevelTypes.topKeyDown:
-      case topLevelTypes.topKeyUp:
+      case 'topKeyDown':
+      case 'topKeyUp':
         EventConstructor = SyntheticKeyboardEvent;
         break;
-      case topLevelTypes.topBlur:
-      case topLevelTypes.topFocus:
+      case 'topBlur':
+      case 'topFocus':
         EventConstructor = SyntheticFocusEvent;
         break;
-      case topLevelTypes.topClick:
+      case 'topClick':
         // Firefox creates a click event on right mouse clicks. This removes the
         // unwanted click events.
         if (nativeEvent.button === 2) {
           return null;
         }
         /* falls through */
-      case topLevelTypes.topContextMenu:
-      case topLevelTypes.topDoubleClick:
-      case topLevelTypes.topMouseDown:
-      case topLevelTypes.topMouseMove:
-      case topLevelTypes.topMouseOut:
-      case topLevelTypes.topMouseOver:
-      case topLevelTypes.topMouseUp:
+      case 'topContextMenu':
+      case 'topDoubleClick':
+      case 'topMouseDown':
+      case 'topMouseMove':
+      case 'topMouseOut':
+      case 'topMouseOver':
+      case 'topMouseUp':
         EventConstructor = SyntheticMouseEvent;
         break;
-      case topLevelTypes.topDrag:
-      case topLevelTypes.topDragEnd:
-      case topLevelTypes.topDragEnter:
-      case topLevelTypes.topDragExit:
-      case topLevelTypes.topDragLeave:
-      case topLevelTypes.topDragOver:
-      case topLevelTypes.topDragStart:
-      case topLevelTypes.topDrop:
+      case 'topDrag':
+      case 'topDragEnd':
+      case 'topDragEnter':
+      case 'topDragExit':
+      case 'topDragLeave':
+      case 'topDragOver':
+      case 'topDragStart':
+      case 'topDrop':
         EventConstructor = SyntheticDragEvent;
         break;
-      case topLevelTypes.topTouchCancel:
-      case topLevelTypes.topTouchEnd:
-      case topLevelTypes.topTouchMove:
-      case topLevelTypes.topTouchStart:
+      case 'topTouchCancel':
+      case 'topTouchEnd':
+      case 'topTouchMove':
+      case 'topTouchStart':
         EventConstructor = SyntheticTouchEvent;
         break;
-      case topLevelTypes.topAnimationEnd:
-      case topLevelTypes.topAnimationIteration:
-      case topLevelTypes.topAnimationStart:
+      case 'topAnimationEnd':
+      case 'topAnimationIteration':
+      case 'topAnimationStart':
         EventConstructor = SyntheticAnimationEvent;
         break;
-      case topLevelTypes.topTransitionEnd:
+      case 'topTransitionEnd':
         EventConstructor = SyntheticTransitionEvent;
         break;
-      case topLevelTypes.topScroll:
+      case 'topScroll':
         EventConstructor = SyntheticUIEvent;
         break;
-      case topLevelTypes.topWheel:
+      case 'topWheel':
         EventConstructor = SyntheticWheelEvent;
         break;
-      case topLevelTypes.topCopy:
-      case topLevelTypes.topCut:
-      case topLevelTypes.topPaste:
+      case 'topCopy':
+      case 'topCut':
+      case 'topPaste':
         EventConstructor = SyntheticClipboardEvent;
         break;
     }
@@ -619,11 +620,11 @@ var SimpleEventPlugin = {
     // non-interactive elements, which means delegated click listeners do not
     // fire. The workaround for this bug involves attaching an empty click
     // listener on the target node.
-    if (registrationName === ON_CLICK_KEY) {
-      var id = inst._rootNodeID;
+    if (registrationName === 'onClick') {
+      var key = getDictionaryKey(inst);
       var node = ReactDOMComponentTree.getNodeFromInstance(inst);
-      if (!onClickListeners[id]) {
-        onClickListeners[id] = EventListener.listen(
+      if (!onClickListeners[key]) {
+        onClickListeners[key] = EventListener.listen(
           node,
           'click',
           emptyFunction
@@ -633,10 +634,10 @@ var SimpleEventPlugin = {
   },
 
   willDeleteListener: function(inst, registrationName) {
-    if (registrationName === ON_CLICK_KEY) {
-      var id = inst._rootNodeID;
-      onClickListeners[id].remove();
-      delete onClickListeners[id];
+    if (registrationName === 'onClick') {
+      var key = getDictionaryKey(inst);
+      onClickListeners[key].remove();
+      delete onClickListeners[key];
     }
   },
 

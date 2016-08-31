@@ -35,11 +35,11 @@ describe('ReactStatelessComponent', function() {
   });
 
   it('should update stateless component', function() {
-    var Parent = React.createClass({
+    class Parent extends React.Component {
       render() {
         return <StatelessComponent {...this.props} />;
-      },
-    });
+      }
+    }
 
     var el = document.createElement('div');
     ReactDOM.render(<Parent name="A" />, el);
@@ -60,33 +60,33 @@ describe('ReactStatelessComponent', function() {
   });
 
   it('should pass context thru stateless component', function() {
-    var Child = React.createClass({
-      contextTypes: {
+    class Child extends React.Component {
+      static contextTypes = {
         test: React.PropTypes.string.isRequired,
-      },
+      };
 
-      render: function() {
+      render() {
         return <div>{this.context.test}</div>;
-      },
-    });
+      }
+    }
 
     function Parent() {
       return <Child />;
     }
 
-    var GrandParent = React.createClass({
-      childContextTypes: {
+    class GrandParent extends React.Component {
+      static childContextTypes = {
         test: React.PropTypes.string.isRequired,
-      },
+      };
 
       getChildContext() {
         return {test: this.props.test};
-      },
+      }
 
-      render: function() {
+      render() {
         return <Parent />;
-      },
-    });
+      }
+    }
 
     var el = document.createElement('div');
     ReactDOM.render(<GrandParent test="test" />, el);
@@ -98,6 +98,27 @@ describe('ReactStatelessComponent', function() {
     expect(el.textContent).toBe('mest');
   });
 
+  it('should warn for childContextTypes on a functional component', () => {
+    spyOn(console, 'error');
+    function StatelessComponentWithChildContext(props) {
+      return <div>{props.name}</div>;
+    }
+
+    StatelessComponentWithChildContext.childContextTypes = {
+      foo: React.PropTypes.string,
+    };
+
+    var container = document.createElement('div');
+
+    ReactDOM.render(<StatelessComponentWithChildContext name="A" />, container);
+
+    expect(console.error.calls.count()).toBe(1);
+    expect(console.error.calls.argsFor(0)[0]).toContain(
+      'StatelessComponentWithChildContext(...): childContextTypes cannot ' +
+      'be defined on a functional component.'
+    );
+  });
+
   it('should warn when stateless component returns array', function() {
     spyOn(console, 'error');
     function NotAComponent() {
@@ -106,9 +127,9 @@ describe('ReactStatelessComponent', function() {
     expect(function() {
       ReactTestUtils.renderIntoDocument(<div><NotAComponent /></div>);
     }).toThrow();
-    expect(console.error.calls.length).toBe(1);
-    expect(console.error.argsForCall[0][0]).toContain(
-      'NotAComponent(...): A valid React element (or null) must be returned. '+
+    expect(console.error.calls.count()).toBe(1);
+    expect(console.error.calls.argsFor(0)[0]).toContain(
+      'NotAComponent(...): A valid React element (or null) must be returned. ' +
       'You may have returned undefined, an array or some other invalid object.'
     );
   });
@@ -120,7 +141,7 @@ describe('ReactStatelessComponent', function() {
 
     expect(function() {
       ReactTestUtils.renderIntoDocument(<Child test="test" />);
-    }).toThrow(
+    }).toThrowError(
       'Stateless function components cannot have refs.'
     );
   });
@@ -128,16 +149,18 @@ describe('ReactStatelessComponent', function() {
   it('should warn when given a ref', function() {
     spyOn(console, 'error');
 
-    var Parent = React.createClass({
-      displayName: 'Parent',
-      render: function() {
+    class Parent extends React.Component {
+      static displayName = 'Parent';
+
+      render() {
         return <StatelessComponent name="A" ref="stateless"/>;
-      },
-    });
+      }
+    }
+
     ReactTestUtils.renderIntoDocument(<Parent/>);
 
-    expect(console.error.argsForCall.length).toBe(1);
-    expect(console.error.argsForCall[0][0]).toContain(
+    expect(console.error.calls.count()).toBe(1);
+    expect(console.error.calls.argsFor(0)[0]).toContain(
       'Stateless function components cannot be given refs ' +
       '(See ref "stateless" in StatelessComponent created by Parent). ' +
       'Attempts to access this ref will fail.'
@@ -160,9 +183,9 @@ describe('ReactStatelessComponent', function() {
 
     spyOn(console, 'error');
     ReactTestUtils.renderIntoDocument(<Child />);
-    expect(console.error.argsForCall.length).toBe(1);
-    expect(console.error.argsForCall[0][0]).toContain('a unique "key" prop');
-    expect(console.error.argsForCall[0][0]).toContain('Child');
+    expect(console.error.calls.count()).toBe(1);
+    expect(console.error.calls.argsFor(0)[0]).toContain('a unique "key" prop');
+    expect(console.error.calls.argsFor(0)[0]).toContain('Child');
   });
 
   it('should support default props and prop types', function() {
@@ -174,28 +197,31 @@ describe('ReactStatelessComponent', function() {
 
     spyOn(console, 'error');
     ReactTestUtils.renderIntoDocument(<Child />);
-    expect(console.error.argsForCall.length).toBe(1);
+    expect(console.error.calls.count()).toBe(1);
     expect(
-      console.error.argsForCall[0][0].replace(/\(at .+?:\d+\)/g, '(at **)')
+      console.error.calls.argsFor(0)[0].replace(/\(at .+?:\d+\)/g, '(at **)')
     ).toBe(
-      'Warning: Failed propType: Invalid prop `test` of type `number` ' +
+      'Warning: Failed prop type: Invalid prop `test` of type `number` ' +
       'supplied to `Child`, expected `string`.\n' +
       '    in Child (at **)'
     );
   });
 
   it('should receive context', function() {
-    var Parent = React.createClass({
-      childContextTypes: {
+    class Parent extends React.Component {
+      static childContextTypes = {
         lang: React.PropTypes.string,
-      },
-      getChildContext: function() {
+      };
+
+      getChildContext() {
         return {lang: 'en'};
-      },
-      render: function() {
+      }
+
+      render() {
         return <Child />;
-      },
-    });
+      }
+    }
+
     function Child(props, context) {
       return <div>{context.lang}</div>;
     }
@@ -239,8 +265,8 @@ describe('ReactStatelessComponent', function() {
     expect(function() {
       ReactTestUtils.renderIntoDocument(<div><NotAComponent /></div>);
     }).toThrow();  // has no method 'render'
-    expect(console.error.calls.length).toBe(1);
-    expect(console.error.argsForCall[0][0]).toContain(
+    expect(console.error.calls.count()).toBe(1);
+    expect(console.error.calls.argsFor(0)[0]).toContain(
       'NotAComponent(...): A valid React element (or null) must be returned. You may ' +
       'have returned undefined, an array or some other invalid object.'
     );

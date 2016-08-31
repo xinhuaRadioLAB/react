@@ -101,11 +101,11 @@ describe('ReactMultiChild', function() {
         },
       });
 
-      var WrapperComponent = React.createClass({
-        render: function() {
+      class WrapperComponent extends React.Component {
+        render() {
           return this.props.children || <MockComponent />;
-        },
-      });
+        }
+      }
 
       expect(mockMount.mock.calls.length).toBe(0);
       expect(mockUnmount.mock.calls.length).toBe(0);
@@ -157,14 +157,14 @@ describe('ReactMultiChild', function() {
 
       var container = document.createElement('div');
 
-      var WrapperComponent = React.createClass({
-        render: function() {
+      class WrapperComponent extends React.Component {
+        render() {
           return <div>{this.props.children}</div>;
-        },
-      });
+        }
+      }
 
-      var Parent = React.createClass({
-        render: function() {
+      class Parent extends React.Component {
+        render() {
           return (
             <div>
               <WrapperComponent>
@@ -172,8 +172,8 @@ describe('ReactMultiChild', function() {
               </WrapperComponent>
             </div>
           );
-        },
-      });
+        }
+      }
 
       ReactDOM.render(
         <Parent>{[<div key="1"/>]}</Parent>,
@@ -185,8 +185,8 @@ describe('ReactMultiChild', function() {
         container
       );
 
-      expect(console.error.argsForCall.length).toBe(1);
-      expect(normalizeCodeLocInfo(console.error.argsForCall[0][0])).toBe(
+      expect(console.error.calls.count()).toBe(1);
+      expect(normalizeCodeLocInfo(console.error.calls.argsFor(0)[0])).toBe(
         'Warning: flattenChildren(...): ' +
         'Encountered two children with the same key, `1`. ' +
         'Child keys must be unique; when two children share a key, ' +

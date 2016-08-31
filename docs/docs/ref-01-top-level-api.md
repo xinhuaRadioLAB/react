@@ -1,7 +1,7 @@
 ---
 id: top-level-api
 title: Top-Level API
-permalink: top-level-api.html
+permalink: docs/top-level-api.html
 next: component-api.html
 redirect_from: "/docs/reference.html"
 ---
@@ -131,6 +131,10 @@ array React.Children.toArray(object children)
 ```
 
 Return the `children` opaque data structure as a flat array with keys assigned to each child. Useful if you want to manipulate collections of children in your render methods, especially if you want to reorder or slice `this.props.children` before passing it down.
+
+> Note:
+> 
+> `React.Children.toArray()` changes keys to preserve the semantics of nested arrays when flattening lists of children. That is, `toArray` prefixes each key in the returned array so that each element's key is scoped to the input array containing it.
 
 ## ReactDOM
 

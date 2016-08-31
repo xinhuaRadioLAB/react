@@ -16,10 +16,12 @@ describe('ReactPerf', function() {
   var ReactDOM;
   var ReactPerf;
   var ReactTestUtils;
+  var emptyFunction;
 
   var App;
   var Box;
   var Div;
+  var LifeCycle;
 
   beforeEach(function() {
     var now = 0;
@@ -36,24 +38,36 @@ describe('ReactPerf', function() {
     ReactDOM = require('ReactDOM');
     ReactPerf = require('ReactPerf');
     ReactTestUtils = require('ReactTestUtils');
+    emptyFunction = require('emptyFunction');
 
-    App = React.createClass({
-      render: function() {
+    App = class extends React.Component {
+      render() {
         return <div><Box /><Box flip={this.props.flipSecond} /></div>;
-      },
-    });
+      }
+    };
 
-    Box = React.createClass({
-      render: function() {
+    Box = class extends React.Component {
+      render() {
         return <div key={!!this.props.flip}><input /></div>;
-      },
-    });
+      }
+    };
 
     // ReactPerf only measures composites, so we put everything in one.
-    Div = React.createClass({
-      render: function() {
+    Div = class extends React.Component {
+      render() {
         return <div {...this.props} />;
-      },
+      }
+    };
+
+    LifeCycle = React.createClass({
+      shouldComponentUpdate: emptyFunction.thatReturnsTrue,
+      componentWillMount: emptyFunction,
+      componentDidMount: emptyFunction,
+      componentWillReceiveProps: emptyFunction,
+      componentWillUpdate: emptyFunction,
+      componentDidUpdate: emptyFunction,
+      componentWillUnmount: emptyFunction,
+      render: emptyFunction.thatReturnsNull,
     });
   });
 
@@ -215,7 +229,7 @@ describe('ReactPerf', function() {
     });
   });
 
-  it('should not count replacing null with a native as waste', function() {
+  it('should not count replacing null with a host as waste', function() {
     var element = null;
     function Foo() {
       return element;
@@ -228,7 +242,7 @@ describe('ReactPerf', function() {
     });
   });
 
-  it('should not count replacing a native with null as waste', function() {
+  it('should not count replacing a host with null as waste', function() {
     var element = <div />;
     function Foo() {
       return element;
@@ -256,32 +270,147 @@ describe('ReactPerf', function() {
     }]);
   });
 
+  it('should include lifecycle methods in measurements', function() {
+    var container = document.createElement('div');
+    var measurements = measure(() => {
+      var instance = ReactDOM.render(<LifeCycle />, container);
+      ReactDOM.render(<LifeCycle />, container);
+      instance.setState({});
+      ReactDOM.unmountComponentAtNode(container);
+    });
+    expect(ReactPerf.getExclusive(measurements)).toEqual([{
+      key: 'LifeCycle',
+      instanceCount: 1,
+      totalDuration: 14,
+      counts: {
+        ctor: 1,
+        shouldComponentUpdate: 2,
+        componentWillMount: 1,
+        componentDidMount: 1,
+        componentWillReceiveProps: 1,
+        componentWillUpdate: 2,
+        componentDidUpdate: 2,
+        componentWillUnmount: 1,
+        render: 3,
+      },
+      durations: {
+        ctor: 1,
+        shouldComponentUpdate: 2,
+        componentWillMount: 1,
+        componentDidMount: 1,
+        componentWillReceiveProps: 1,
+        componentWillUpdate: 2,
+        componentDidUpdate: 2,
+        componentWillUnmount: 1,
+        render: 3,
+      },
+    }]);
+  });
+
+  it('should include render time of functional components', function() {
+    function Foo() {
+      return null;
+    }
+
+    var container = document.createElement('div');
+    var measurements = measure(() => {
+      ReactDOM.render(<Foo />, container);
+    });
+    expect(ReactPerf.getExclusive(measurements)).toEqual([{
+      key: 'Foo',
+      instanceCount: 1,
+      totalDuration: 1,
+      counts: {
+        render: 1,
+      },
+      durations: {
+        render: 1,
+      },
+    }]);
+  });
+
+  it('should not count time in a portal towards lifecycle method', function() {
+    function Foo() {
+      return null;
+    }
+
+    var portalContainer = document.createElement('div');
+    class Portal extends React.Component {
+      componentDidMount() {
+        ReactDOM.render(<Foo />, portalContainer);
+      }
+      render() {
+        return null;
+      }
+    }
+
+    var container = document.createElement('div');
+    var measurements = measure(() => {
+      ReactDOM.render(<Portal />, container);
+    });
+
+    expect(ReactPerf.getExclusive(measurements)).toEqual([{
+      key: 'Portal',
+      instanceCount: 1,
+      totalDuration: 6,
+      counts: {
+        ctor: 1,
+        componentDidMount: 1,
+        render: 1,
+      },
+      durations: {
+        ctor: 1,
+        // We want to exclude nested imperative ReactDOM.render() from lifecycle hook's own time.
+        // Otherwise it would artificially float to the top even though its exclusive time is small.
+        // This is how we get 4 as a number with the performanceNow() mock:
+        // - we capture the time we enter componentDidMount (n = 0)
+        // - we capture the time when we enter a nested flush (n = 1)
+        // - in the nested flush, we call it twice: before and after <Foo /> rendering. (n = 3)
+        // - we capture the time when we exit a nested flush (n = 4)
+        // - we capture the time we exit componentDidMount (n = 5)
+        // Time spent in componentDidMount = (5 - 0 - (4 - 3)) = 4.
+        componentDidMount: 4,
+        render: 1,
+      },
+    }, {
+      key: 'Foo',
+      instanceCount: 1,
+      totalDuration: 1,
+      counts: {
+        render: 1,
+      },
+      durations: {
+        render: 1,
+      },
+    }]);
+  });
+
   it('warns once when using getMeasurementsSummaryMap', function() {
     var measurements = measure(() => {});
     spyOn(console, 'error');
     ReactPerf.getMeasurementsSummaryMap(measurements);
-    expect(console.error.calls.length).toBe(1);
-    expect(console.error.argsForCall[0][0]).toContain(
+    expect(console.error.calls.count()).toBe(1);
+    expect(console.error.calls.argsFor(0)[0]).toContain(
       '`ReactPerf.getMeasurementsSummaryMap(...)` is deprecated. Use ' +
       '`ReactPerf.getWasted(...)` instead.'
     );
 
     ReactPerf.getMeasurementsSummaryMap(measurements);
-    expect(console.error.calls.length).toBe(1);
+    expect(console.error.calls.count()).toBe(1);
   });
 
   it('warns once when using printDOM', function() {
     var measurements = measure(() => {});
     spyOn(console, 'error');
     ReactPerf.printDOM(measurements);
-    expect(console.error.calls.length).toBe(1);
-    expect(console.error.argsForCall[0][0]).toContain(
+    expect(console.error.calls.count()).toBe(1);
+    expect(console.error.calls.argsFor(0)[0]).toContain(
       '`ReactPerf.printDOM(...)` is deprecated. Use ' +
       '`ReactPerf.printOperations(...)` instead.'
     );
 
     ReactPerf.printDOM(measurements);
-    expect(console.error.calls.length).toBe(1);
+    expect(console.error.calls.count()).toBe(1);
   });
 
   it('returns isRunning state', () => {
@@ -315,5 +444,280 @@ describe('ReactPerf', function() {
 
     ReactPerf.stop();
     expect(ReactPerf.isRunning()).toBe(false);
+  });
+
+  it('should print console error only once', () => {
+    __DEV__ = false;
+
+    spyOn(console, 'error');
+
+    expect(ReactPerf.getLastMeasurements()).toEqual([]);
+    expect(ReactPerf.getExclusive()).toEqual([]);
+    expect(ReactPerf.getInclusive()).toEqual([]);
+    expect(ReactPerf.getWasted()).toEqual([]);
+    expect(ReactPerf.getOperations()).toEqual([]);
+    expect(ReactPerf.printExclusive()).toEqual(undefined);
+    expect(ReactPerf.printInclusive()).toEqual(undefined);
+    expect(ReactPerf.printWasted()).toEqual(undefined);
+    expect(ReactPerf.printOperations()).toEqual(undefined);
+    expect(ReactPerf.start()).toBe(undefined);
+    expect(ReactPerf.stop()).toBe(undefined);
+    expect(ReactPerf.isRunning()).toBe(false);
+
+    expect(console.error.calls.count()).toBe(1);
+
+    __DEV__ = true;
+  });
+
+  it('should work when measurement starts during reconciliation', () => {
+    // https://github.com/facebook/react/issues/6949#issuecomment-230371009
+    class Measurer extends React.Component {
+      componentWillMount() {
+        ReactPerf.start();
+      }
+
+      componentDidMount() {
+        ReactPerf.stop();
+      }
+
+      componentWillUpdate() {
+        ReactPerf.start();
+      }
+
+      componentDidUpdate() {
+        ReactPerf.stop();
+      }
+
+      render() {
+        // Force reconciliation despite constant element
+        return React.cloneElement(this.props.children);
+      }
+    }
+
+    var container = document.createElement('div');
+    ReactDOM.render(<Measurer><App /></Measurer>, container);
+    expect(ReactPerf.getWasted()).toEqual([]);
+
+    ReactDOM.render(<Measurer><App /></Measurer>, container);
+    expect(ReactPerf.getWasted()).toEqual([{
+      key: 'Measurer',
+      instanceCount: 1,
+      inclusiveRenderDuration: 4,
+      renderCount: 1,
+    }, {
+      key: 'App',
+      instanceCount: 1,
+      inclusiveRenderDuration: 3,
+      renderCount: 1,
+    }, {
+      key: 'App > Box',
+      instanceCount: 2,
+      inclusiveRenderDuration: 2,
+      renderCount: 2,
+    }]);
+  });
+
+  it('should not print errant warnings if render() throws', () => {
+    var container = document.createElement('div');
+    var thrownErr = new Error('Muhaha!');
+
+    class Evil extends React.Component {
+      render() {
+        throw thrownErr;
+      }
+    }
+
+    ReactPerf.start();
+    try {
+      ReactDOM.render(
+        <div>
+          <LifeCycle />
+          <Evil />
+        </div>,
+        container
+      );
+    } catch (err) {
+      if (err !== thrownErr) {
+        throw err;
+      }
+    }
+    ReactPerf.stop();
+  });
+
+  it('should not print errant warnings if componentWillMount() throws', () => {
+    var container = document.createElement('div');
+    var thrownErr = new Error('Muhaha!');
+
+    class Evil extends React.Component {
+      componentWillMount() {
+        throw thrownErr;
+      }
+      render() {
+        return <div />;
+      }
+    }
+
+    ReactPerf.start();
+    try {
+      ReactDOM.render(
+        <div>
+          <LifeCycle />
+          <Evil />
+        </div>,
+        container
+      );
+    } catch (err) {
+      if (err !== thrownErr) {
+        throw err;
+      }
+    }
+    ReactPerf.stop();
+  });
+
+  it('should not print errant warnings if componentDidMount() throws', () => {
+    var container = document.createElement('div');
+    var thrownErr = new Error('Muhaha!');
+
+    class Evil extends React.Component {
+      componentDidMount() {
+        throw thrownErr;
+      }
+      render() {
+        return <div />;
+      }
+    }
+
+    ReactPerf.start();
+    try {
+      ReactDOM.render(
+        <div>
+          <LifeCycle />
+          <Evil />
+        </div>,
+        container
+      );
+    } catch (err) {
+      if (err !== thrownErr) {
+        throw err;
+      }
+    }
+    ReactPerf.stop();
+  });
+
+  it('should not print errant warnings if portal throws in render()', () => {
+    var container = document.createElement('div');
+    var thrownErr = new Error('Muhaha!');
+
+    class Evil extends React.Component {
+      render() {
+        throw thrownErr;
+      }
+    }
+    class EvilPortal extends React.Component {
+      componentWillMount() {
+        var portalContainer = document.createElement('div');
+        ReactDOM.render(<Evil />, portalContainer);
+      }
+      render() {
+        return <div />;
+      }
+    }
+
+    ReactPerf.start();
+    try {
+      ReactDOM.render(
+        <div>
+          <LifeCycle />
+          <EvilPortal />
+        </div>,
+        container
+      );
+    } catch (err) {
+      if (err !== thrownErr) {
+        throw err;
+      }
+    }
+    ReactDOM.unmountComponentAtNode(container);
+    ReactPerf.stop();
+  });
+
+  it('should not print errant warnings if portal throws in componentWillMount()', () => {
+    var container = document.createElement('div');
+    var thrownErr = new Error('Muhaha!');
+
+    class Evil extends React.Component {
+      componentWillMount() {
+        throw thrownErr;
+      }
+      render() {
+        return <div />;
+      }
+    }
+    class EvilPortal extends React.Component {
+      componentWillMount() {
+        var portalContainer = document.createElement('div');
+        ReactDOM.render(<Evil />, portalContainer);
+      }
+      render() {
+        return <div />;
+      }
+    }
+
+    ReactPerf.start();
+    try {
+      ReactDOM.render(
+        <div>
+          <LifeCycle />
+          <EvilPortal />
+        </div>,
+        container
+      );
+    } catch (err) {
+      if (err !== thrownErr) {
+        throw err;
+      }
+    }
+    ReactDOM.unmountComponentAtNode(container);
+    ReactPerf.stop();
+  });
+
+  it('should not print errant warnings if portal throws in componentDidMount()', () => {
+    var container = document.createElement('div');
+    var thrownErr = new Error('Muhaha!');
+
+    class Evil extends React.Component {
+      componentDidMount() {
+        throw thrownErr;
+      }
+      render() {
+        return <div />;
+      }
+    }
+    class EvilPortal extends React.Component {
+      componentWillMount() {
+        var portalContainer = document.createElement('div');
+        ReactDOM.render(<Evil />, portalContainer);
+      }
+      render() {
+        return <div />;
+      }
+    }
+
+    ReactPerf.start();
+    try {
+      ReactDOM.render(
+        <div>
+          <LifeCycle />
+          <EvilPortal />
+        </div>,
+        container
+      );
+    } catch (err) {
+      if (err !== thrownErr) {
+        throw err;
+      }
+    }
+    ReactDOM.unmountComponentAtNode(container);
+    ReactPerf.stop();
   });
 });

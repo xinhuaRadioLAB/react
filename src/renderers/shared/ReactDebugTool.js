@@ -7,63 +7,136 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *
  * @providesModule ReactDebugTool
+ * @flow
  */
 
 'use strict';
 
+var ReactInvalidSetStateWarningHook = require('ReactInvalidSetStateWarningHook');
+var ReactHostOperationHistoryHook = require('ReactHostOperationHistoryHook');
+var ReactComponentTreeHook = require('ReactComponentTreeHook');
+var ReactChildrenMutationWarningHook = require('ReactChildrenMutationWarningHook');
 var ExecutionEnvironment = require('ExecutionEnvironment');
 
 var performanceNow = require('performanceNow');
 var warning = require('warning');
 
-var eventHandlers = [];
-var handlerDoesThrowForEvent = {};
+import type { ReactElement } from 'ReactElementType';
+import type { DebugID } from 'ReactInstanceType';
 
-function emitEvent(handlerFunctionName, arg1, arg2, arg3, arg4, arg5) {
-  if (__DEV__) {
-    eventHandlers.forEach(function(handler) {
-      try {
-        if (handler[handlerFunctionName]) {
-          handler[handlerFunctionName](arg1, arg2, arg3, arg4, arg5);
-        }
-      } catch (e) {
-        warning(
-          handlerDoesThrowForEvent[handlerFunctionName],
-          'exception thrown by devtool while handling %s: %s',
-          handlerFunctionName,
-          e + '\n' + e.stack
-        );
-        handlerDoesThrowForEvent[handlerFunctionName] = true;
-      }
-    });
+type Hook = any;
+type Payload = mixed;
+
+type TimerType =
+  'ctor' |
+  'render' |
+  'componentWillMount' |
+  'componentWillUnmount' |
+  'componentWillReceiveProps' |
+  'shouldComponentUpdate' |
+  'componentWillUpdate' |
+  'componentDidUpdate' |
+  'componentDidMount';
+
+type HostOperationType =
+  'mount' |
+  'insert child' |
+  'move child' |
+  'remove child' |
+  'replace children' |
+  'replace text' |
+  'replace with';
+
+type Operation = {
+  instanceID: DebugID,
+  type: string,
+  payload: Payload,
+};
+
+type Measurement = {
+  timerType: TimerType,
+  instanceID: DebugID,
+  duration: number,
+};
+
+type TreeSnapshot = {
+  [key: DebugID]: {
+    displayName: string,
+    text: string,
+    updateCount: number,
+    childIDs: Array<DebugID>,
+    ownerID: DebugID,
+    parentID: DebugID,
+  }
+};
+
+type HistoryItem = {
+  duration: number,
+  measurements: Array<Measurement>,
+  operations: Array<Operation>,
+  treeSnapshot: TreeSnapshot,
+};
+
+export type FlushHistory = Array<HistoryItem>;
+
+var hooks = [];
+var didHookThrowForEvent = {};
+
+function callHook(event, fn, context, arg1, arg2, arg3, arg4, arg5) {
+  try {
+    fn.call(context, arg1, arg2, arg3, arg4, arg5);
+  } catch (e) {
+    warning(
+      didHookThrowForEvent[event],
+      'Exception thrown by hook while handling %s: %s',
+      event,
+      e + '\n' + e.stack
+    );
+    didHookThrowForEvent[event] = true;
+  }
+}
+
+function emitEvent(event, arg1, arg2, arg3, arg4, arg5) {
+  for (var i = 0; i < hooks.length; i++) {
+    var hook = hooks[i];
+    var fn = hook[event];
+    if (fn) {
+      callHook(event, fn, hook, arg1, arg2, arg3, arg4, arg5);
+    }
   }
 }
 
 var isProfiling = false;
 var flushHistory = [];
+var lifeCycleTimerStack = [];
 var currentFlushNesting = 0;
-var currentFlushMeasurements = null;
-var currentFlushStartTime = null;
+var currentFlushMeasurements = [];
+var currentFlushStartTime = 0;
 var currentTimerDebugID = null;
-var currentTimerStartTime = null;
+var currentTimerStartTime = 0;
+var currentTimerNestedFlushDuration = 0;
 var currentTimerType = null;
 
+var lifeCycleTimerHasWarned = false;
+
 function clearHistory() {
-  ReactComponentTreeDevtool.purgeUnmountedComponents();
-  ReactHostOperationHistoryDevtool.clearHistory();
+  ReactComponentTreeHook.purgeUnmountedComponents();
+  ReactHostOperationHistoryHook.clearHistory();
 }
 
 function getTreeSnapshot(registeredIDs) {
   return registeredIDs.reduce((tree, id) => {
-    var ownerID = ReactComponentTreeDevtool.getOwnerID(id);
-    var parentID = ReactComponentTreeDevtool.getParentID(id);
+    var ownerID = ReactComponentTreeHook.getOwnerID(id);
+    var parentID = ReactComponentTreeHook.getParentID(id);
     tree[id] = {
-      displayName: ReactComponentTreeDevtool.getDisplayName(id),
-      text: ReactComponentTreeDevtool.getText(id),
-      updateCount: ReactComponentTreeDevtool.getUpdateCount(id),
-      childIDs: ReactComponentTreeDevtool.getChildIDs(id),
+      displayName: ReactComponentTreeHook.getDisplayName(id),
+      text: ReactComponentTreeHook.getText(id),
+      updateCount: ReactComponentTreeHook.getUpdateCount(id),
+      childIDs: ReactComponentTreeHook.getChildIDs(id),
       // Text nodes don't have owners but this is close enough.
-      ownerID: ownerID || ReactComponentTreeDevtool.getOwnerID(parentID),
+      ownerID: ownerID ||
+        parentID && ReactComponentTreeHook.getOwnerID(parentID) ||
+        0,
       parentID,
     };
     return tree;
@@ -71,219 +144,298 @@ function getTreeSnapshot(registeredIDs) {
 }
 
 function resetMeasurements() {
-  if (__DEV__) {
-    var previousStartTime = currentFlushStartTime;
-    var previousMeasurements = currentFlushMeasurements || [];
-    var previousOperations = ReactHostOperationHistoryDevtool.getHistory();
+  var previousStartTime = currentFlushStartTime;
+  var previousMeasurements = currentFlushMeasurements;
+  var previousOperations = ReactHostOperationHistoryHook.getHistory();
 
-    if (!isProfiling || currentFlushNesting === 0) {
-      currentFlushStartTime = null;
-      currentFlushMeasurements = null;
-      clearHistory();
-      return;
-    }
-
-    if (previousMeasurements.length || previousOperations.length) {
-      var registeredIDs = ReactComponentTreeDevtool.getRegisteredIDs();
-      flushHistory.push({
-        duration: performanceNow() - previousStartTime,
-        measurements: previousMeasurements || [],
-        operations: previousOperations || [],
-        treeSnapshot: getTreeSnapshot(registeredIDs),
-      });
-    }
-
-    clearHistory();
-    currentFlushStartTime = performanceNow();
+  if (currentFlushNesting === 0) {
+    currentFlushStartTime = 0;
     currentFlushMeasurements = [];
+    clearHistory();
+    return;
+  }
+
+  if (previousMeasurements.length || previousOperations.length) {
+    var registeredIDs = ReactComponentTreeHook.getRegisteredIDs();
+    flushHistory.push({
+      duration: performanceNow() - previousStartTime,
+      measurements: previousMeasurements || [],
+      operations: previousOperations || [],
+      treeSnapshot: getTreeSnapshot(registeredIDs),
+    });
+  }
+
+  clearHistory();
+  currentFlushStartTime = performanceNow();
+  currentFlushMeasurements = [];
+}
+
+function checkDebugID(debugID, allowRoot = false) {
+  if (allowRoot && debugID === 0) {
+    return;
+  }
+  if (!debugID) {
+    warning(false, 'ReactDebugTool: debugID may not be empty.');
   }
 }
 
-function checkDebugID(debugID) {
-  warning(debugID, 'ReactDebugTool: debugID may not be empty.');
+function beginLifeCycleTimer(debugID, timerType) {
+  if (currentFlushNesting === 0) {
+    return;
+  }
+  if (currentTimerType && !lifeCycleTimerHasWarned) {
+    warning(
+      false,
+      'There is an internal error in the React performance measurement code. ' +
+      'Did not expect %s timer to start while %s timer is still in ' +
+      'progress for %s instance.',
+      timerType,
+      currentTimerType || 'no',
+      (debugID === currentTimerDebugID) ? 'the same' : 'another'
+    );
+    lifeCycleTimerHasWarned = true;
+  }
+  currentTimerStartTime = performanceNow();
+  currentTimerNestedFlushDuration = 0;
+  currentTimerDebugID = debugID;
+  currentTimerType = timerType;
+}
+
+function endLifeCycleTimer(debugID, timerType) {
+  if (currentFlushNesting === 0) {
+    return;
+  }
+  if (currentTimerType !== timerType && !lifeCycleTimerHasWarned) {
+    warning(
+      false,
+      'There is an internal error in the React performance measurement code. ' +
+      'We did not expect %s timer to stop while %s timer is still in ' +
+      'progress for %s instance. Please report this as a bug in React.',
+      timerType,
+      currentTimerType || 'no',
+      (debugID === currentTimerDebugID) ? 'the same' : 'another'
+    );
+    lifeCycleTimerHasWarned = true;
+  }
+  if (isProfiling) {
+    currentFlushMeasurements.push({
+      timerType,
+      instanceID: debugID,
+      duration: performanceNow() - currentTimerStartTime - currentTimerNestedFlushDuration,
+    });
+  }
+  currentTimerStartTime = 0;
+  currentTimerNestedFlushDuration = 0;
+  currentTimerDebugID = null;
+  currentTimerType = null;
+}
+
+function pauseCurrentLifeCycleTimer() {
+  var currentTimer = {
+    startTime: currentTimerStartTime,
+    nestedFlushStartTime: performanceNow(),
+    debugID: currentTimerDebugID,
+    timerType: currentTimerType,
+  };
+  lifeCycleTimerStack.push(currentTimer);
+  currentTimerStartTime = 0;
+  currentTimerNestedFlushDuration = 0;
+  currentTimerDebugID = null;
+  currentTimerType = null;
+}
+
+function resumeCurrentLifeCycleTimer() {
+  var {startTime, nestedFlushStartTime, debugID, timerType} = lifeCycleTimerStack.pop();
+  var nestedFlushDuration = performanceNow() - nestedFlushStartTime;
+  currentTimerStartTime = startTime;
+  currentTimerNestedFlushDuration += nestedFlushDuration;
+  currentTimerDebugID = debugID;
+  currentTimerType = timerType;
+}
+
+var lastMarkTimeStamp = 0;
+var canUsePerformanceMeasure: bool =
+// $FlowFixMe https://github.com/facebook/flow/issues/2345
+  typeof performance !== 'undefined' &&
+  typeof performance.mark === 'function' &&
+  typeof performance.clearMarks === 'function' &&
+  typeof performance.measure === 'function' &&
+  typeof performance.clearMeasures === 'function';
+
+function shouldMark(debugID) {
+  if (!isProfiling || !canUsePerformanceMeasure) {
+    return false;
+  }
+  var element = ReactComponentTreeHook.getElement(debugID);
+  if (element == null || typeof element !== 'object') {
+    return false;
+  }
+  var isHostElement = typeof element.type === 'string';
+  if (isHostElement) {
+    return false;
+  }
+  return true;
+}
+
+function markBegin(debugID, markType) {
+  if (!shouldMark(debugID)) {
+    return;
+  }
+
+  var markName = `${debugID}::${markType}`;
+  lastMarkTimeStamp = performanceNow();
+  performance.mark(markName);
+}
+
+function markEnd(debugID, markType) {
+  if (!shouldMark(debugID)) {
+    return;
+  }
+
+  var markName = `${debugID}::${markType}`;
+  var displayName = ReactComponentTreeHook.getDisplayName(debugID) || 'Unknown';
+
+  // Chrome has an issue of dropping markers recorded too fast:
+  // https://bugs.chromium.org/p/chromium/issues/detail?id=640652
+  // To work around this, we will not report very small measurements.
+  // I determined the magic number by tweaking it back and forth.
+  // 0.05ms was enough to prevent the issue, but I set it to 0.1ms to be safe.
+  // When the bug is fixed, we can `measure()` unconditionally if we want to.
+  var timeStamp = performanceNow();
+  if (timeStamp - lastMarkTimeStamp > 0.1) {
+    var measurementName = `${displayName} [${markType}]`;
+    performance.measure(measurementName, markName);
+  }
+
+  performance.clearMarks(markName);
+  performance.clearMeasures(measurementName);
 }
 
 var ReactDebugTool = {
-  addDevtool(devtool) {
-    eventHandlers.push(devtool);
+  addHook(hook: Hook): void {
+    hooks.push(hook);
   },
-  removeDevtool(devtool) {
-    for (var i = 0; i < eventHandlers.length; i++) {
-      if (eventHandlers[i] === devtool) {
-        eventHandlers.splice(i, 1);
+  removeHook(hook: Hook): void {
+    for (var i = 0; i < hooks.length; i++) {
+      if (hooks[i] === hook) {
+        hooks.splice(i, 1);
         i--;
       }
     }
   },
-  isProfiling() {
+  isProfiling(): bool {
     return isProfiling;
   },
-  beginProfiling() {
-    if (__DEV__) {
-      if (isProfiling) {
-        return;
-      }
+  beginProfiling(): void {
+    if (isProfiling) {
+      return;
+    }
 
-      isProfiling = true;
-      flushHistory.length = 0;
-      resetMeasurements();
-    }
+    isProfiling = true;
+    flushHistory.length = 0;
+    resetMeasurements();
+    ReactDebugTool.addHook(ReactHostOperationHistoryHook);
   },
-  endProfiling() {
-    if (__DEV__) {
-      if (!isProfiling) {
-        return;
-      }
+  endProfiling(): void {
+    if (!isProfiling) {
+      return;
+    }
 
-      isProfiling = false;
-      resetMeasurements();
-    }
+    isProfiling = false;
+    resetMeasurements();
+    ReactDebugTool.removeHook(ReactHostOperationHistoryHook);
   },
-  getFlushHistory() {
-    if (__DEV__) {
-      return flushHistory;
-    }
+  getFlushHistory(): FlushHistory {
+    return flushHistory;
   },
-  onBeginFlush() {
-    if (__DEV__) {
-      currentFlushNesting++;
-      resetMeasurements();
-    }
+  onBeginFlush(): void {
+    currentFlushNesting++;
+    resetMeasurements();
+    pauseCurrentLifeCycleTimer();
     emitEvent('onBeginFlush');
   },
-  onEndFlush() {
-    if (__DEV__) {
-      resetMeasurements();
-      currentFlushNesting--;
-    }
+  onEndFlush(): void {
+    resetMeasurements();
+    currentFlushNesting--;
+    resumeCurrentLifeCycleTimer();
     emitEvent('onEndFlush');
   },
-  onBeginLifeCycleTimer(debugID, timerType) {
+  onBeginLifeCycleTimer(debugID: DebugID, timerType: TimerType): void {
     checkDebugID(debugID);
     emitEvent('onBeginLifeCycleTimer', debugID, timerType);
-    if (__DEV__) {
-      if (isProfiling && currentFlushNesting > 0) {
-        warning(
-          !currentTimerType,
-          'There is an internal error in the React performance measurement code. ' +
-          'Did not expect %s timer to start while %s timer is still in ' +
-          'progress for %s instance.',
-          timerType,
-          currentTimerType || 'no',
-          (debugID === currentTimerDebugID) ? 'the same' : 'another'
-        );
-        currentTimerStartTime = performanceNow();
-        currentTimerDebugID = debugID;
-        currentTimerType = timerType;
-      }
-    }
+    markBegin(debugID, timerType);
+    beginLifeCycleTimer(debugID, timerType);
   },
-  onEndLifeCycleTimer(debugID, timerType) {
+  onEndLifeCycleTimer(debugID: DebugID, timerType: TimerType): void {
     checkDebugID(debugID);
-    if (__DEV__) {
-      if (isProfiling && currentFlushNesting > 0) {
-        warning(
-          currentTimerType === timerType,
-          'There is an internal error in the React performance measurement code. ' +
-          'We did not expect %s timer to stop while %s timer is still in ' +
-          'progress for %s instance. Please report this as a bug in React.',
-          timerType,
-          currentTimerType || 'no',
-          (debugID === currentTimerDebugID) ? 'the same' : 'another'
-        );
-        currentFlushMeasurements.push({
-          timerType,
-          instanceID: debugID,
-          duration: performanceNow() - currentTimerStartTime,
-        });
-        currentTimerStartTime = null;
-        currentTimerDebugID = null;
-        currentTimerType = null;
-      }
-    }
+    endLifeCycleTimer(debugID, timerType);
+    markEnd(debugID, timerType);
     emitEvent('onEndLifeCycleTimer', debugID, timerType);
   },
-  onBeginReconcilerTimer(debugID, timerType) {
-    checkDebugID(debugID);
-    emitEvent('onBeginReconcilerTimer', debugID, timerType);
-  },
-  onEndReconcilerTimer(debugID, timerType) {
-    checkDebugID(debugID);
-    emitEvent('onEndReconcilerTimer', debugID, timerType);
-  },
-  onBeginProcessingChildContext() {
+  onBeginProcessingChildContext(): void {
     emitEvent('onBeginProcessingChildContext');
   },
-  onEndProcessingChildContext() {
+  onEndProcessingChildContext(): void {
     emitEvent('onEndProcessingChildContext');
   },
-  onHostOperation(debugID, type, payload) {
+  onHostOperation(debugID: DebugID, type: HostOperationType, payload: Payload): void {
     checkDebugID(debugID);
     emitEvent('onHostOperation', debugID, type, payload);
   },
-  onSetState() {
+  onSetState(): void {
     emitEvent('onSetState');
   },
-  onSetDisplayName(debugID, displayName) {
+  onSetChildren(debugID: DebugID, childDebugIDs: Array<DebugID>) {
     checkDebugID(debugID);
-    emitEvent('onSetDisplayName', debugID, displayName);
-  },
-  onSetChildren(debugID, childDebugIDs) {
-    checkDebugID(debugID);
+    childDebugIDs.forEach(checkDebugID);
     emitEvent('onSetChildren', debugID, childDebugIDs);
   },
-  onSetOwner(debugID, ownerDebugID) {
+  onBeforeMountComponent(debugID: DebugID, element: ReactElement, parentDebugID: DebugID): void {
     checkDebugID(debugID);
-    emitEvent('onSetOwner', debugID, ownerDebugID);
+    checkDebugID(parentDebugID, true);
+    emitEvent('onBeforeMountComponent', debugID, element, parentDebugID);
+    markBegin(debugID, 'mount');
   },
-  onSetParent(debugID, parentDebugID) {
+  onMountComponent(debugID: DebugID): void {
     checkDebugID(debugID);
-    emitEvent('onSetParent', debugID, parentDebugID);
-  },
-  onSetText(debugID, text) {
-    checkDebugID(debugID);
-    emitEvent('onSetText', debugID, text);
-  },
-  onMountRootComponent(debugID) {
-    checkDebugID(debugID);
-    emitEvent('onMountRootComponent', debugID);
-  },
-  onBeforeMountComponent(debugID, element) {
-    checkDebugID(debugID);
-    emitEvent('onBeforeMountComponent', debugID, element);
-  },
-  onMountComponent(debugID) {
-    checkDebugID(debugID);
+    markEnd(debugID, 'mount');
     emitEvent('onMountComponent', debugID);
   },
-  onBeforeUpdateComponent(debugID, element) {
+  onBeforeUpdateComponent(debugID: DebugID, element: ReactElement): void {
     checkDebugID(debugID);
     emitEvent('onBeforeUpdateComponent', debugID, element);
+    markBegin(debugID, 'update');
   },
-  onUpdateComponent(debugID) {
+  onUpdateComponent(debugID: DebugID): void {
     checkDebugID(debugID);
+    markEnd(debugID, 'update');
     emitEvent('onUpdateComponent', debugID);
   },
-  onUnmountComponent(debugID) {
+  onBeforeUnmountComponent(debugID: DebugID): void {
     checkDebugID(debugID);
+    emitEvent('onBeforeUnmountComponent', debugID);
+    markBegin(debugID, 'unmount');
+  },
+  onUnmountComponent(debugID: DebugID): void {
+    checkDebugID(debugID);
+    markEnd(debugID, 'unmount');
     emitEvent('onUnmountComponent', debugID);
   },
-  onTestEvent() {
+  onTestEvent(): void {
     emitEvent('onTestEvent');
   },
 };
 
-if (__DEV__) {
-  var ReactInvalidSetStateWarningDevTool = require('ReactInvalidSetStateWarningDevTool');
-  var ReactHostOperationHistoryDevtool = require('ReactHostOperationHistoryDevtool');
-  var ReactComponentTreeDevtool = require('ReactComponentTreeDevtool');
-  ReactDebugTool.addDevtool(ReactInvalidSetStateWarningDevTool);
-  ReactDebugTool.addDevtool(ReactComponentTreeDevtool);
-  ReactDebugTool.addDevtool(ReactHostOperationHistoryDevtool);
-  var url = (ExecutionEnvironment.canUseDOM && window.location.href) || '';
-  if ((/[?&]react_perf\b/).test(url)) {
-    ReactDebugTool.beginProfiling();
-  }
+// TODO remove these when RN/www gets updated
+(ReactDebugTool: any).addDevtool = ReactDebugTool.addHook;
+(ReactDebugTool: any).removeDevtool = ReactDebugTool.removeHook;
+
+ReactDebugTool.addHook(ReactInvalidSetStateWarningHook);
+ReactDebugTool.addHook(ReactComponentTreeHook);
+ReactDebugTool.addHook(ReactChildrenMutationWarningHook);
+var url = (ExecutionEnvironment.canUseDOM && window.location.href) || '';
+if ((/[?&]react_perf\b/).test(url)) {
+  ReactDebugTool.beginProfiling();
 }
 
 module.exports = ReactDebugTool;

@@ -32,16 +32,16 @@ describe('ReactChildReconciler', function() {
   it('warns for duplicated keys', function() {
     spyOn(console, 'error');
 
-    var Component = React.createClass({
+    class Component extends React.Component {
       render() {
         return <div>{[<div key="1" />, <div key="1" />]}</div>;
-      },
-    });
+      }
+    }
 
     ReactTestUtils.renderIntoDocument(<Component />);
 
-    expect(console.error.argsForCall.length).toBe(1);
-    expect(console.error.argsForCall[0][0]).toContain(
+    expect(console.error.calls.count()).toBe(1);
+    expect(console.error.calls.argsFor(0)[0]).toContain(
       'Child keys must be unique; when two children share a key, only the first child will be used.'
     );
   });
@@ -49,28 +49,28 @@ describe('ReactChildReconciler', function() {
   it('warns for duplicated keys with component stack info', function() {
     spyOn(console, 'error');
 
-    var Component = React.createClass({
-      render: function() {
+    class Component extends React.Component {
+      render() {
         return <div>{[<div key="1" />, <div key="1" />]}</div>;
-      },
-    });
+      }
+    }
 
-    var Parent = React.createClass({
-      render: function() {
+    class Parent extends React.Component {
+      render() {
         return React.cloneElement(this.props.child);
-      },
-    });
+      }
+    }
 
-    var GrandParent = React.createClass({
-      render: function() {
+    class GrandParent extends React.Component {
+      render() {
         return <Parent child={<Component />} />;
-      },
-    });
+      }
+    }
 
     ReactTestUtils.renderIntoDocument(<GrandParent />);
 
-    expect(console.error.argsForCall.length).toBe(1);
-    expect(normalizeCodeLocInfo(console.error.argsForCall[0][0])).toBe(
+    expect(console.error.calls.count()).toBe(1);
+    expect(normalizeCodeLocInfo(console.error.calls.argsFor(0)[0])).toBe(
       'Warning: flattenChildren(...): ' +
       'Encountered two children with the same key, `1`. ' +
       'Child keys must be unique; when two children share a key, ' +

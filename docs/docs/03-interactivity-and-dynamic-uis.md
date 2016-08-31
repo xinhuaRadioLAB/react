@@ -1,7 +1,7 @@
 ---
 id: interactivity-and-dynamic-uis
 title: Interactivity and Dynamic UIs
-permalink: interactivity-and-dynamic-uis.html
+permalink: docs/interactivity-and-dynamic-uis.html
 prev: jsx-gotchas.html
 next: multiple-components.html
 ---
@@ -16,14 +16,14 @@ class LikeButton extends React.Component {
     super();
     this.state = {
       liked: false
-    }
+    };
     this.handleClick = this.handleClick.bind(this);
   }
   handleClick() {
     this.setState({liked: !this.state.liked});
   }
   render() {
-    const text = this.state.liked ? 'like' : 'haven\'t liked';
+    const text = this.state.liked ? 'liked' : 'haven\'t liked';
     return (
       <div onClick={this.handleClick}>
         You {text} this. Click to toggle.

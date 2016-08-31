@@ -19,14 +19,13 @@
 'use strict';
 
 var ReactCurrentOwner = require('ReactCurrentOwner');
-var ReactComponentTreeDevtool = require('ReactComponentTreeDevtool');
+var ReactComponentTreeHook = require('ReactComponentTreeHook');
 var ReactElement = require('ReactElement');
-var ReactPropTypeLocationNames = require('ReactPropTypeLocationNames');
-var ReactPropTypeLocations = require('ReactPropTypeLocations');
+
+var checkReactTypeSpec = require('checkReactTypeSpec');
 
 var canDefineProperty = require('canDefineProperty');
 var getIteratorFn = require('getIteratorFn');
-var invariant = require('invariant');
 var warning = require('warning');
 
 function getDeclarationErrorAddendum() {
@@ -45,8 +44,6 @@ function getDeclarationErrorAddendum() {
  * updates.
  */
 var ownerHasKeyUseWarning = {};
-
-var loggedTypeFailures = {};
 
 function getCurrentComponentErrorInfo(parentType) {
   var info = getDeclarationErrorAddendum();
@@ -106,7 +103,7 @@ function validateExplicitKey(element, parentType) {
     '%s%s See https://fb.me/react-warning-keys for more information.%s',
     currentComponentErrorInfo,
     childOwner,
-    ReactComponentTreeDevtool.getCurrentStackAddendum(element)
+    ReactComponentTreeHook.getCurrentStackAddendum(element)
   );
 }
 
@@ -153,66 +150,6 @@ function validateChildKeys(node, parentType) {
 }
 
 /**
- * Assert that the props are valid
- *
- * @param {object} element
- * @param {string} componentName Name of the component for error messages.
- * @param {object} propTypes Map of prop name to a ReactPropType
- * @param {string} location e.g. "prop", "context", "child context"
- * @private
- */
-function checkPropTypes(element, componentName, propTypes, location) {
-  var props = element.props;
-  for (var propName in propTypes) {
-    if (propTypes.hasOwnProperty(propName)) {
-      var error;
-      // Prop type validation may throw. In case they do, we don't want to
-      // fail the render phase where it didn't fail before. So we log it.
-      // After these have been cleaned up, we'll let them throw.
-      try {
-        // This is intentionally an invariant that gets caught. It's the same
-        // behavior as without this statement except with a better message.
-        invariant(
-          typeof propTypes[propName] === 'function',
-          '%s: %s type `%s` is invalid; it must be a function, usually from ' +
-          'React.PropTypes.',
-          componentName || 'React class',
-          ReactPropTypeLocationNames[location],
-          propName
-        );
-        error = propTypes[propName](props, propName, componentName, location);
-      } catch (ex) {
-        error = ex;
-      }
-      warning(
-        !error || error instanceof Error,
-        '%s: type specification of %s `%s` is invalid; the type checker ' +
-        'function must return `null` or an `Error` but returned a %s. ' +
-        'You may have forgotten to pass an argument to the type checker ' +
-        'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' +
-        'shape all require an argument).',
-        componentName || 'React class',
-        ReactPropTypeLocationNames[location],
-        propName,
-        typeof error
-      );
-      if (error instanceof Error && !(error.message in loggedTypeFailures)) {
-        // Only monitor this failure once because there tends to be a lot of the
-        // same error.
-        loggedTypeFailures[error.message] = true;
-
-        warning(
-          false,
-          'Failed propType: %s%s',
-          error.message,
-          ReactComponentTreeDevtool.getCurrentStackAddendum(element)
-        );
-      }
-    }
-  }
-}
-
-/**
  * Given an element, validate that its props follow the propTypes definition,
  * provided by the type.
  *
@@ -225,11 +162,13 @@ function validatePropTypes(element) {
   }
   var name = componentClass.displayName || componentClass.name;
   if (componentClass.propTypes) {
-    checkPropTypes(
-      element,
-      name,
+    checkReactTypeSpec(
       componentClass.propTypes,
-      ReactPropTypeLocations.prop
+      element.props,
+      'prop',
+      name,
+      element,
+      null
     );
   }
   if (typeof componentClass.getDefaultProps === 'function') {
@@ -244,16 +183,19 @@ function validatePropTypes(element) {
 var ReactElementValidator = {
 
   createElement: function(type, props, children) {
-    var validType = typeof type === 'string' || typeof type === 'function';
+    var validType = typeof type === 'string' || typeof type === 'function' ||
+                    (type !== null && typeof type === 'object');
     // We warn in this case but don't throw. We expect the element creation to
     // succeed and there will likely be errors in render.
-    warning(
-      validType,
-      'React.createElement: type should not be null, undefined, boolean, or ' +
-        'number. It should be a string (for DOM elements) or a ReactClass ' +
-        '(for composite components).%s',
-      getDeclarationErrorAddendum()
-    );
+    if (!validType) {
+      warning(
+        false,
+        'React.createElement: type should not be null, undefined, boolean, or ' +
+          'number. It should be a string (for DOM elements) or a ReactClass ' +
+          '(for composite components).%s',
+        getDeclarationErrorAddendum()
+      );
+    }
 
     var element = ReactElement.createElement.apply(this, arguments);
 

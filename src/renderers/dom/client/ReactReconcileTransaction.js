@@ -15,7 +15,9 @@ var CallbackQueue = require('CallbackQueue');
 var PooledClass = require('PooledClass');
 var ReactBrowserEventEmitter = require('ReactBrowserEventEmitter');
 var ReactInputSelection = require('ReactInputSelection');
+var ReactInstrumentation = require('ReactInstrumentation');
 var Transaction = require('Transaction');
+var ReactUpdateQueue = require('ReactUpdateQueue');
 
 
 /**
@@ -90,6 +92,13 @@ var TRANSACTION_WRAPPERS = [
   ON_DOM_READY_QUEUEING,
 ];
 
+if (__DEV__) {
+  TRANSACTION_WRAPPERS.push({
+    initialize: ReactInstrumentation.debugTool.onBeginFlush,
+    close: ReactInstrumentation.debugTool.onEndFlush,
+  });
+}
+
 /**
  * Currently:
  * - The order that these are listed in the transaction is critical:
@@ -136,6 +145,13 @@ var Mixin = {
   },
 
   /**
+   * @return {object} The queue to collect React async events.
+   */
+  getUpdateQueue: function() {
+    return ReactUpdateQueue;
+  },
+
+  /**
    * Save current transaction state -- if the return value from this method is
    * passed to `rollback`, the transaction will be reset to that state.
    */
@@ -159,7 +175,7 @@ var Mixin = {
 };
 
 
-Object.assign(ReactReconcileTransaction.prototype, Transaction.Mixin, Mixin);
+Object.assign(ReactReconcileTransaction.prototype, Transaction, Mixin);
 
 PooledClass.addPoolingTo(ReactReconcileTransaction);
 
